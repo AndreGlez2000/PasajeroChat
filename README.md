@@ -202,7 +202,3 @@ For deployment, the database either needs a persistent volume or a migration to 
 The Messenger/WhatsApp webhook integration is not yet implemented. The FSM is fully functional and tested via the terminal harness. The next integration step is replacing `terminal.ts` with a webhook handler that maps incoming messages to `psid` values and passes them through the existing `stateMachine.ts`.
 
 ---
-
-## Development notes
-
-FSM business rules, transition table, and architectural decisions are documented in `CLAUDE.md`.
