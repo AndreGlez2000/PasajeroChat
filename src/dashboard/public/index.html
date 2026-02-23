@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PasajeroChat · Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ===== Header ===== -->
+<header class="header">
+    <div class="header-brand">
+        <span class="brand-name">PasajeroChat</span>
+        <span class="brand-sep">/</span>
+        <span class="brand-section">Dashboard</span>
+    </div>
+
+    <div class="header-system">
+        <span class="system-dot" id="silenceDot"></span>
+        <span class="system-text" id="silenceText">Cargando…</span>
+    </div>
+
+    <div class="header-meta">
+        <span class="meta-updated" id="lastUpdate">–</span>
+        <div class="live-indicator" id="liveIndicator">
+            <span class="live-dot"></span>
+            <span id="liveLabel">Conectando</span>
+        </div>
+    </div>
+</header>
+
+<!-- ===== Alert Strip ===== -->
+<div class="alert-strip" id="alertStrip" hidden>
+    <div class="alert-container">
+        <ul class="alert-list" id="alertList"></ul>
+    </div>
+</div>
+
+<!-- ===== Main content ===== -->
+<div class="page">
+
+    <!-- KPI Row -->
+    <div class="kpi-row">
+        <div class="kpi-card" id="kpiActive">
+            <div class="kpi-label">Activos ahora</div>
+            <div class="kpi-value" id="kpiActiveVal">–</div>
+            <div class="kpi-meta">Reportes vigentes</div>
+        </div>
+        <div class="kpi-card" id="kpiToday">
+            <div class="kpi-label">Reportes hoy</div>
+            <div class="kpi-value" id="kpiTodayVal">–</div>
+            <div class="kpi-meta">Últimas 24 horas</div>
+        </div>
+        <div class="kpi-card" id="kpiUsers">
+            <div class="kpi-label">Usuarios únicos hoy</div>
+            <div class="kpi-value" id="kpiUsersVal">–</div>
+            <div class="kpi-meta">Últimas 24 horas</div>
+        </div>
+        <div class="kpi-card" id="kpiLastHour">
+            <div class="kpi-label">Última hora</div>
+            <div class="kpi-value" id="kpiLastHourVal">–</div>
+            <div class="kpi-meta">Reportes en los últimos 60 min</div>
+        </div>
+    </div>
+
+    <!-- Active reports + Route coverage -->
+    <div class="row row--main">
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Reportes activos</h2>
+                <span class="tag tag--live" id="activeTag">0 activos</span>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ruta</th>
+                            <th>Variante</th>
+                            <th>Parada</th>
+                            <th>Reportado</th>
+                            <th>Vence en</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activeReportsBody">
+                        <tr><td colspan="5" class="empty-row">Cargando…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel panel--sidebar">
+            <div class="panel-header">
+                <h2 class="panel-title">Cobertura por ruta</h2>
+                <span class="tag">7 días</span>
+            </div>
+            <div id="routeCoverageList" class="coverage-list"></div>
+        </div>
+
+    </div>
+
+    <!-- Charts -->
+    <div class="row">
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Actividad por hora</h2>
+                <span class="tag">Últimas 24h</span>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="chartHour24"></canvas>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Histograma histórico</h2>
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <span class="legend-dot" style="background:var(--violet)"></span>
+                        <span>Hoy</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot legend-dot--dashed"></span>
+                        <span>Prom. 30 días</span>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="chartHistorical"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Suspicious users + Top stops -->
+    <div class="row row--bottom">
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Usuarios bajo revisión</h2>
+                <span class="tag">Últimas 24h</span>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th class="col-right">Reportes 24h</th>
+                            <th class="col-right">Reportes 1h</th>
+                            <th>Última actividad</th>
+                        </tr>
+                    </thead>
+                    <tbody id="suspiciousBody">
+                        <tr><td colspan="4" class="empty-row">Sin actividad inusual detectada</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Top paradas</h2>
+                <span class="tag">Histórico</span>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Parada</th>
+                            <th>Ruta</th>
+                            <th>Reportes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topStopsBody">
+                        <tr><td colspan="4" class="empty-row">Sin datos</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div><!-- .page -->
+
+<script src="app.js"></script>
+</body>
+</html>

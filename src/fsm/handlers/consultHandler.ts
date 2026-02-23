@@ -9,7 +9,7 @@ export async function handleConsult(psid: string, userState: UserState, text: st
         if (input === '1') routeName = 'Violeta';
         else if (input === '2') routeName = 'SITT';
         else if (input === '3') routeName = 'Suburbaja';
-        else return "❌ Opción no válida. Escribe:\n1 - Violeta\n2 - SITT\n3 - Suburbaja\n0 - Regresar";
+        else return "Opción no válida. Escribe:\n1 - Violeta\n2 - SITT\n3 - Suburbaja\n0 - Regresar";
 
         const res = await query('SELECT id FROM routes WHERE name = $1', [routeName]);
         if (res.rows.length === 0) return "Error: Ruta no encontrada en BD.";
@@ -23,7 +23,7 @@ export async function handleConsult(psid: string, userState: UserState, text: st
 
     if (userState.state === 'consultando_variante') {
         const variantIndex = parseInt(input);
-        if (isNaN(variantIndex)) return "❌ Por favor ingresa un número válido.\n0. Regresar";
+        if (isNaN(variantIndex)) return "Por favor ingresa un número válido.\n0. Regresar";
 
         const res = await query(
             'SELECT id, name FROM route_variants WHERE route_id = $1 ORDER BY id ASC',
@@ -31,7 +31,7 @@ export async function handleConsult(psid: string, userState: UserState, text: st
         );
 
         if (variantIndex < 1 || variantIndex > res.rows.length) {
-            return `❌ Opción no válida. Elige un número del 1 al ${res.rows.length}.\n0. Regresar`;
+            return `Opción no válida. Elige un número del 1 al ${res.rows.length}.\n0. Regresar`;
         }
 
         const selectedVariant = res.rows[variantIndex - 1];
@@ -48,7 +48,7 @@ export async function handleConsult(psid: string, userState: UserState, text: st
             userState.data = { timestamp: Date.now() };
             return getMenuText();
         } else {
-            return "❌ Opción no válida.\n1. Regresar al menú";
+            return "Opción no válida.\n1. Regresar al menú";
         }
     }
 

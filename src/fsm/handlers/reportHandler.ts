@@ -10,7 +10,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
         if (input === '1') routeName = 'Violeta';
         else if (input === '2') routeName = 'SITT';
         else if (input === '3') routeName = 'Suburbaja';
-        else return "❌ Opción no válida. Escribe:\n1 - Violeta\n2 - SITT\n3 - Suburbaja\n0 - Regresar";
+        else return "Opción no válida. Escribe:\n1 - Violeta\n2 - SITT\n3 - Suburbaja\n0 - Regresar";
 
         const res = await query('SELECT id FROM routes WHERE name = $1', [routeName]);
         if (res.rows.length === 0) return "Error: Ruta no encontrada en BD.";
@@ -27,7 +27,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
 
     if (userState.state.startsWith('aguardando_variante_')) {
         const variantIndex = parseInt(input);
-        if (isNaN(variantIndex)) return "❌ Por favor ingresa un número válido.\n0. Regresar";
+        if (isNaN(variantIndex)) return "Por favor ingresa un número válido.\n0. Regresar";
 
         const res = await query(
             'SELECT id, name FROM route_variants WHERE route_id = $1 ORDER BY id ASC',
@@ -35,7 +35,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
         );
 
         if (variantIndex < 1 || variantIndex > res.rows.length) {
-            return `❌ Opción no válida. Elige un número del 1 al ${res.rows.length}.\n0. Regresar`;
+            return `Opción no válida. Elige un número del 1 al ${res.rows.length}.\n0. Regresar`;
         }
 
         const selectedVariant = res.rows[variantIndex - 1];
@@ -48,7 +48,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
 
     if (userState.state === 'aguardando_parada') {
         const stopIndex = parseInt(input);
-        if (isNaN(stopIndex)) return "❌ Por favor ingresa un número válido.\n0. Regresar";
+        if (isNaN(stopIndex)) return "Por favor ingresa un número válido.\n0. Regresar";
 
         const res = await query(
             'SELECT id, name FROM stops WHERE variant_id = $1 ORDER BY stop_number ASC',
@@ -56,7 +56,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
         );
 
         if (stopIndex < 1 || stopIndex > res.rows.length) {
-            return `❌ Opción no válida. Elige un número del 1 al ${res.rows.length}.\n0. Regresar`;
+            return `Opción no válida. Elige un número del 1 al ${res.rows.length}.\n0. Regresar`;
         }
 
         const selectedStop = res.rows[stopIndex - 1];
@@ -90,7 +90,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
         const variantName = userState.data.variant_name;
         userState.state = 'menu';
         userState.data = { timestamp: Date.now() };
-        const successMsg = `✅ ¡Reporte guardado exitosamente!\n🚌 ${rutaNombre} (${variantName})\n📍 ${selectedStop.name}\n\n¡Gracias por ayudar a la comunidad!\n`;
+        const successMsg = `¡Reporte guardado exitosamente!\n🚌 ${rutaNombre} (${variantName})\n📍 ${selectedStop.name}\n\n¡Gracias por ayudar a la comunidad!\n`;
         return successMsg + "\n" + (await handleMenu(psid, userState, ''));
     }
 

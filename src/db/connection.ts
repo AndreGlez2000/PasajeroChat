@@ -3,11 +3,17 @@ import path from 'path';
 
 const dbPath = path.join(__dirname, '../../pasajerochat.sqlite');
 
+let resolveDbReady: (message: string) => void;
+export const dbReady = new Promise<string>((resolve) => {
+    resolveDbReady = resolve;
+});
+
 export const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Error conectando a SQLite:', err.message);
+        resolveDbReady('Error conectando a la base de datos SQLite.');
     } else {
-        console.log('Conectado a la base de datos SQLite.');
+        resolveDbReady('Conectado a la base de datos SQLite.');
     }
 });
 
