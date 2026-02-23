@@ -1,0 +1,37 @@
+-- schema.sql
+CREATE TABLE IF NOT EXISTS routes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS route_variants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    route_id INTEGER REFERENCES routes(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    direction TEXT
+);
+
+CREATE TABLE IF NOT EXISTS stops (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    variant_id INTEGER REFERENCES route_variants(id) ON DELETE CASCADE,
+    stop_number INTEGER NOT NULL,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    variant_id INTEGER REFERENCES route_variants(id) ON DELETE CASCADE,
+    stop_id INTEGER REFERENCES stops(id) ON DELETE CASCADE,
+    user_psid TEXT NOT NULL,
+    reported_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME,
+    is_active BOOLEAN DEFAULT 1,
+    confirm_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS confirmations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id INTEGER REFERENCES reports(id) ON DELETE CASCADE,
+    user_psid TEXT NOT NULL,
+    confirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
