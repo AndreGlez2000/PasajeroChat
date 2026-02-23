@@ -54,7 +54,6 @@ export async function handleMessage(psid: string, text: string): Promise<string>
             case 'consultando_ruta':
             case 'consultando_variante':
             case 'mostrando_resultados':
-            case 'confirmando_avistamiento':
                 response = await handleConsult(psid, userState, text);
                 break;
 

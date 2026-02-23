@@ -8,7 +8,6 @@ export type StateName =
     | 'consultando_ruta'
     | 'consultando_variante'
     | 'mostrando_resultados'
-    | 'confirmando_avistamiento'
     | 'mostrando_mapas';
 
 export interface UserState {
@@ -21,6 +20,5 @@ export interface UserState {
         variant_name?: string;
         stop_id?: number;
         stop_name?: string;
-        last_reports?: any[];
     };
 }

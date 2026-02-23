@@ -6,7 +6,8 @@
   "scripts": {
     "start:terminal": "ts-node src/terminal.ts",
     "seed": "ts-node src/scripts/seed.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "repository": {
     "type": "git",
@@ -30,6 +31,7 @@
     "@types/sqlite3": "^3.1.11",
     "nodemon": "^3.1.13",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

@@ -13,7 +13,7 @@ export async function handleConsult(psid: string, userState: UserState, text: st
 
         const res = await query('SELECT id FROM routes WHERE name = $1', [routeName]);
         if (res.rows.length === 0) return "Error: Ruta no encontrada en BD.";
-        
+
         userState.data.ruta_id = res.rows[0].id;
         userState.data.ruta_nombre = routeName;
         userState.state = 'consultando_variante';
@@ -43,15 +43,12 @@ export async function handleConsult(psid: string, userState: UserState, text: st
     }
 
     if (userState.state === 'mostrando_resultados') {
-        if (input === '1' && userState.data.last_reports && userState.data.last_reports.length > 0) {
-            userState.state = 'confirmando_avistamiento';
-            return await processConfirmation(psid, userState);
-        } else if (input === '2') {
+        if (input === '1') {
             userState.state = 'menu';
             userState.data = { timestamp: Date.now() };
-            return await getMenuText();
+            return getMenuText();
         } else {
-            return "❌ Opción no válida.\n1. Yo también la vi (Confirmar el más reciente)\n2. Regresar al menú";
+            return "❌ Opción no válida.\n1. Regresar al menú";
         }
     }
 
@@ -70,7 +67,7 @@ async function getVariantsMenu(routeId: number): Promise<string> {
 
 async function showResults(userState: UserState): Promise<string> {
     const res = await query(
-        `SELECT r.id, s.name as stop_name, r.reported_at, r.confirm_count 
+        `SELECT r.id, s.name as stop_name, r.reported_at, r.confirm_count
          FROM reports r
          JOIN stops s ON r.stop_id = s.id
          WHERE r.variant_id = $1 AND r.is_active = 1 AND r.expires_at > datetime('now')
@@ -83,13 +80,11 @@ async function showResults(userState: UserState): Promise<string> {
         const variantName = userState.data.variant_name;
         userState.state = 'menu';
         userState.data = { timestamp: Date.now() };
-        return `No hay reportes recientes activos para ${rutaNombre} (${variantName}).\n\n` + await getMenuText();
+        return `No hay reportes recientes activos para ${rutaNombre} (${variantName}).\n\n` + getMenuText();
     }
 
-    userState.data.last_reports = res.rows;
-
     let response = `📋 Últimos avistamientos para ${userState.data.ruta_nombre} (${userState.data.variant_name}):\n\n`;
-    
+
     res.rows.forEach((row: any) => {
         // SQLite devuelve fechas como strings en formato UTC
         const reportedAt = new Date(row.reported_at + 'Z');
@@ -98,36 +93,10 @@ async function showResults(userState: UserState): Promise<string> {
         response += `• ${row.stop_name} - hace ${minutesAgo} min ${checks} (${row.confirm_count} confirmaciones)\n`;
     });
 
-    response += `\n¿Qué hacer?\n1. Yo también la vi (Confirma el reporte más reciente)\n2. Regresar al menú`;
+    response += `\n1. Regresar al menú`;
     return response;
 }
 
-async function processConfirmation(psid: string, userState: UserState): Promise<string> {
-    const latestReport = userState.data.last_reports![0];
-    // SQLite devuelve fechas como strings en formato UTC
-    const reportedAt = new Date(latestReport.reported_at + 'Z');
-    const minutesAgo = Math.floor((Date.now() - reportedAt.getTime()) / 60000);
-
-    if (minutesAgo < 20) {
-        // Incrementar confirmación
-        await query('UPDATE reports SET confirm_count = confirm_count + 1 WHERE id = $1', [latestReport.id]);
-        await query('INSERT INTO confirmations (report_id, user_psid) VALUES ($1, $2)', [latestReport.id, psid]);
-        userState.state = 'menu';
-        userState.data = { timestamp: Date.now() };
-        return `✅ ¡Confirmación guardada! Gracias por validar la información.\n\n` + await getMenuText();
-    } else {
-        // Crear nuevo reporte en la misma parada porque ya pasó mucho tiempo
-        await query(
-            `INSERT INTO reports (variant_id, stop_id, user_psid, expires_at) 
-             VALUES ($1, (SELECT stop_id FROM reports WHERE id = $2), $3, datetime('now', '+90 minutes'))`,
-            [userState.data.variant_id, latestReport.id, psid]
-        );
-        userState.state = 'menu';
-        userState.data = { timestamp: Date.now() };
-        return `✅ ¡Nuevo reporte creado! Ya había pasado mucho tiempo desde el último avistamiento.\n\n` + await getMenuText();
-    }
-}
-
-async function getMenuText(): Promise<string> {
+function getMenuText(): string {
     return "¡Hola! ¿Qué deseas hacer?\n1. Reportar avistamiento\n2. Consultar última vez visto\n3. Ver mapas";
 }
