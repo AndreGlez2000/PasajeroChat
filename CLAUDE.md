@@ -1,75 +1,84 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Commands
 
 ```bash
-# Run the terminal-based test interface (interactive chatbot)
-npm run start:terminal
-
-# Seed the database with routes, variants, and stops
-npm run seed
+npm run start:terminal   # interactive test harness (stdin → FSM → stdout)
+npm run start:dashboard  # admin dashboard at http://localhost:3000
+npm run seed             # reset DB and repopulate routes/variants/stops
+npm run db:reset         # clear reports only, keep routes/stops intact
+npm test                 # run vitest suite
 ```
 
-TypeScript is compiled on-the-fly via `ts-node`. There is no separate build step for development. The `test` script exists in `package.json` but is not yet implemented.
+TypeScript runs via `ts-node` — no build step in development.
+
+---
+
+## Project context
+
+PasajeroChat is a chatbot for urban bus passengers in Tijuana, Baja California. The problem it solves: information about bus whereabouts currently lives in private WhatsApp groups — people get kicked out arbitrarily and there is no open, neutral source.
+
+The channel is Facebook Messenger (and eventually WhatsApp) because a large portion of the target users have limited mobile data, do not install new apps, but already have Messenger installed and it functions well on low bandwidth.
+
+Users report bus sightings at stops. Other passengers on the same route can query when a bus was last seen. The three routes covered are Violeta, SITT, and Suburbaja.
+
+---
 
 ## Architecture
 
-PasajeroChat is a WhatsApp/Messenger-style chatbot for urban bus passengers. Users can report bus sightings at stops and query when a bus was last seen on a given route.
+### Finite State Machine
 
-### Core Pattern: Finite State Machine (FSM)
-
-All conversation logic lives in a **FSM** (`src/fsm/`). Each user session is tracked in-memory via `Map<string, UserState>` keyed by `psid` (platform-specific user ID). Sessions time out after 30 minutes of inactivity and reset to `menu`.
-
-The FSM has ~18 states. Key ones:
-
-| State | Purpose |
-|---|---|
-| `menu` | Entry point; routes to report or consult flow |
-| `aguardando_ruta` | User choosing a route (Violeta, SITT, Suburbaja) |
-| `aguardando_variante_*` | Variant sub-states (direction/variant selection) |
-| `aguardando_parada` | Stop selection |
-| `consultando_ruta/variante` | Query flow: select route/variant to look up |
-| `mostrando_resultados` | Displays last 5 active reports with confirm counts |
-| `confirmando_avistamiento` | User confirming a sighting ("Yo también la vi") |
-| `mostrando_mapas` | Map link display |
-
-`"0"` returns to menu from any state.
-
-### Handler Modules (`src/fsm/handlers/`)
+All conversation logic lives in `src/fsm/`. Each user session is tracked in-memory via `Map<string, UserState>` keyed by `psid`. Sessions expire after 30 minutes of inactivity and reset to `menu`. Sending `0` from any state returns to menu.
 
 The FSM delegates to three handlers based on current state:
-- `menuHandler` — main menu navigation
-- `reportHandler` — report submission flow (anti-spam: 1 report per 10 min per user)
-- `consultHandler` — query flow + confirmation logic
 
-### Confirmation Logic
+- `menuHandler` — main menu and `mostrando_mapas`
+- `reportHandler` — route → variant → stop → anti-spam check → INSERT
+- `consultHandler` — route → variant → SELECT last 5 active reports
 
-When a user confirms a sighting:
-- **Report < 10 min old** → increment `confirm_count` (voting)
-- **Report > 20 min old** → create a new report (old data, treat as fresh sighting)
+**State transitions:**
 
-### Database (`src/db/`)
+| State | Valid inputs | Next state |
+|---|---|---|
+| `menu` | 1 | `aguardando_ruta` |
+| `menu` | 2 | `consultando_ruta` |
+| `menu` | 3 | `mostrando_mapas` |
+| `aguardando_ruta` | 1/2/3 | `aguardando_variante_*` |
+| `aguardando_variante_*` | numeric index | `aguardando_parada` |
+| `aguardando_parada` | numeric index | anti-spam check → `menu` |
+| `consultando_ruta` | 1/2/3 | `consultando_variante` |
+| `consultando_variante` | numeric index | `mostrando_resultados` |
+| `mostrando_resultados` | any | `menu` |
 
-SQLite3 via `better-sqlite3`-style API in `connection.ts`. Schema:
+Invalid input in any state keeps the state unchanged and shows an error message.
 
-- `routes` — transportation companies
-- `route_variants` — directional variants per route (Ida/Vuelta)
-- `stops` — stops per variant
-- `reports` — sighting reports (expire after 90 min, tracked via `is_active` + `expires_at`)
-- `confirmations` — per-user confirmation records
+**Business rules:**
 
-All menus are database-driven: routes → variants → stops are queried dynamically.
+- Anti-spam: 1 report per user per 10 minutes. Remaining wait time is calculated and shown.
+- Reports expire after 90 minutes via `expires_at`. Queries filter on `is_active = 1 AND expires_at > datetime('now')`.
+- Session timeout: 30 minutes of inactivity resets to `menu`.
+- The "Yo también la vi" confirmation flow was removed from the FSM. The `confirm_count` column and `confirmations` table still exist in the schema but are not written to by any current handler.
 
-### Entry Point
+### Database
 
-`src/terminal.ts` is the current test harness — it simulates a messaging platform by reading from stdin and passing messages through the FSM as if they came from a user with `psid = "terminal-user"`.
+SQLite via `sqlite3` module, wrapped in a Promise-based `query()` helper in `src/db/connection.ts`.
 
-The actual messaging platform integration (Messenger/WhatsApp webhook) is not yet implemented.
+```
+routes          — transportation companies (Violeta, SITT, Suburbaja)
+route_variants  — directional variants per route (Ida / Vuelta)
+stops           — stops per variant, ordered by stop_number
+reports         — sighting reports (90-minute expiration)
+confirmations   — reserved, not used
+```
 
-### Detailed FSM Documentation
+**Important:** SQLite stores `CURRENT_TIMESTAMP` as UTC without timezone info (`"YYYY-MM-DD HH:MM:SS"`). JavaScript's `new Date()` treats this as local time, producing wrong timestamps. Always parse with `new Date(str.replace(' ', 'T') + 'Z')`. The existing code in `reportHandler.ts` and `dashboard/public/app.js` already does this.
 
-`context/FSM_ESTADOS_COMPLETO.md` contains the full state diagram, all transitions, input validation rules, and data structures. Consult it before modifying FSM logic.
+### Admin dashboard
 
-`context/roadmap.md` contains the Scrum backlog and sprint status.
+`src/dashboard/server.ts` serves a real-time operations panel via SSE (10-second push interval). It exposes REST endpoints under `/api/` for all metrics. The frontend in `src/dashboard/public/` renders without any framework.
+
+### Entry point
+
+`src/terminal.ts` simulates a messaging platform via stdin. All messages are processed as `psid = "terminal-user"`.
+
+The Messenger/WhatsApp webhook is not yet implemented. The next integration step is replacing `terminal.ts` with a webhook handler that maps incoming platform events to `psid` values and routes them through `stateMachine.ts`.
