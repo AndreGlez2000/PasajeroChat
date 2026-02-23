@@ -79,13 +79,71 @@ confirmations   — per-user confirmation records (reserved, feature paused)
 
 **Requirements:** Node.js 18+
 
+### 1. Install dependencies
+
 ```bash
 npm install
-npm run seed        # create schema and populate routes/stops
+```
+
+### 2. Initialize the database
+
+Creates the schema and populates all routes, variants, and stops.
+
+```bash
+npm run seed
+```
+
+### 3. Run the chatbot (terminal harness)
+
+```bash
 npm run start:terminal
 ```
 
-The terminal harness simulates a messaging platform. Type as a user and the FSM responds. All messages are processed as `psid = "terminal-user"`.
+This simulates a messaging platform via stdin. Type as a user and the FSM responds. All messages are processed under `psid = "terminal-user"`.
+
+A working session looks like this:
+
+```
+> 1
+¿Qué ruta viste?
+1 - Violeta
+2 - SITT
+3 - Suburbaja
+0 - Regresar
+
+> 2
+¿Qué variante de SITT?
+1 - Insurgentes - Centro
+2 - Centro - Insurgentes
+0 - Regresar
+
+> 1
+¿En qué parada la viste?
+1 - Terminal SITT
+2 - Simon Bolivar
+...
+0 - Regresar
+
+> 5
+¡Reporte guardado exitosamente!
+```
+
+### 4. Run the admin dashboard (optional)
+
+In a separate terminal, with the database already seeded:
+
+```bash
+npm run start:dashboard
+```
+
+Open `http://localhost:3000`. The dashboard connects via SSE and updates every 10 seconds.
+
+### Resetting data between test sessions
+
+```bash
+npm run db:reset   # clears reports, keeps routes and stops
+npm run seed       # full reset — wipes everything and re-seeds
+```
 
 ---
 
@@ -147,6 +205,4 @@ The Messenger/WhatsApp webhook integration is not yet implemented. The FSM is fu
 
 ## Development notes
 
-Full FSM state diagram, transition table, and data structures are documented in `context/FSM_ESTADOS_COMPLETO.md`.
-
-Sprint history and backlog are tracked in `context/roadmap.md`.
+FSM business rules, transition table, and architectural decisions are documented in `CLAUDE.md`.
