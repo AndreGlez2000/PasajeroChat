@@ -219,6 +219,14 @@ function updateChartHistorical(hourlyHistorical) {
 // System silence — header center
 // ================================================================
 
+function fmtSilence(minutes) {
+    if (minutes < 60)   return `${minutes} min`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ${minutes % 60 > 0 ? (minutes % 60) + 'min' : ''}`.trim();
+    const days  = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+}
+
 function updateSystemStatus(silence) {
     const dot  = document.getElementById('silenceDot');
     const text = document.getElementById('silenceText');
@@ -230,16 +238,17 @@ function updateSystemStatus(silence) {
         return;
     }
 
+    const fmt = fmtSilence(silence);
     let status, label;
     if (silence < THRESHOLDS.silence.ok) {
         status = 'ok';
-        label  = `Sistema activo · hace ${silence} min`;
+        label  = `Sistema activo · hace ${fmt}`;
     } else if (silence < THRESHOLDS.silence.crit) {
         status = 'warn';
-        label  = `Baja actividad · hace ${silence} min`;
+        label  = `Baja actividad · hace ${fmt}`;
     } else {
         status = 'crit';
-        label  = `Sin reportes hace ${silence} min`;
+        label  = `Sin reportes hace ${fmt}`;
     }
 
     dot.className  = `system-dot ${status}`;
@@ -256,9 +265,9 @@ function updateAlerts(data) {
 
     // Critical: system silence
     if (data.silence !== null && data.silence >= THRESHOLDS.silence.crit) {
-        alerts.push({ level: 'crit', msg: `Sin reportes hace ${data.silence} minutos — verificar que el sistema esté activo` });
+        alerts.push({ level: 'crit', msg: `Sin reportes hace ${fmtSilence(data.silence)} — verificar que el sistema esté activo` });
     } else if (data.silence !== null && data.silence >= THRESHOLDS.silence.ok) {
-        alerts.push({ level: 'warn', msg: `Baja actividad: último reporte hace ${data.silence} minutos` });
+        alerts.push({ level: 'warn', msg: `Baja actividad: último reporte hace ${fmtSilence(data.silence)}` });
     }
 
     // Warn: abandoned route (no reports in 7d)
