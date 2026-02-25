@@ -6,6 +6,7 @@
   "scripts": {
     "start:terminal": "ts-node src/terminal.ts",
     "start:dashboard": "ts-node src/dashboard/server.ts",
+    "start:webhook": "ts-node src/webhook.ts",
     "seed": "ts-node src/scripts/seed.ts",
     "db:reset": "ts-node src/scripts/reset.ts",
     "test": "vitest run",
