@@ -14,9 +14,11 @@ function makeRes() {
 
 describe('requireAuth', () => {
     it('calls next() when session has userId', () => {
+        const res = makeRes();
         const next = vi.fn();
-        requireAuth(makeReq(1) as Request, makeRes(), next);
+        requireAuth(makeReq(1) as Request, res, next);
         expect(next).toHaveBeenCalledOnce();
+        expect(res.redirect).not.toHaveBeenCalled();
     });
 
     it('redirects to /login when no userId in session', () => {
