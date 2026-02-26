@@ -325,6 +325,91 @@ app.get('/api/analytics/route-coverage', async (_req: Request, res: Response) =>
     catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
+// ---- Admin: User management ----
+
+app.get('/admin/users', requireAuth, async (req: Request, res: Response) => {
+    const result = await query(
+        'SELECT id, username, created_at FROM users ORDER BY created_at ASC',
+        []
+    );
+    const currentId = req.session.userId;
+
+    const rows = result.rows.map((u: any) => `
+        <tr>
+            <td>${escapeHtml(String(u.username))}</td>
+            <td>${escapeHtml(String(u.created_at))}</td>
+            <td>${u.id === currentId
+                ? '<span style="color:#8080a0">—</span>'
+                : `<form method="POST" action="/admin/users/${u.id}/delete" style="display:inline">
+                     <button type="submit" class="btn-del">Eliminar</button>
+                   </form>`
+            }</td>
+        </tr>`).join('');
+
+    res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>PasajeroChat · Usuarios</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#09090e;color:#e4e4f0;font-family:Inter,sans-serif;padding:2rem}
+    h1{font-size:1.2rem;font-weight:600;margin:1rem 0 1.5rem}
+    a{color:#7c3aed;text-decoration:none;font-size:.85rem}
+    table{width:100%;max-width:700px;border-collapse:collapse;margin-bottom:2rem;font-size:.85rem}
+    th,td{padding:.6rem .8rem;text-align:left;border-bottom:1px solid #22222e}
+    th{color:#8080a0;font-weight:500}
+    .btn-del{background:transparent;border:1px solid #ef4444;border-radius:4px;color:#ef4444;cursor:pointer;padding:.2rem .6rem;font-size:.8rem}
+    .btn-del:hover{background:rgba(239,68,68,.1)}
+    fieldset{border:1px solid #22222e;border-radius:8px;padding:1rem;max-width:380px}
+    legend{color:#8080a0;font-size:.8rem;padding:0 .4rem}
+    label{display:block;font-size:.8rem;color:#8080a0;margin:.5rem 0 .25rem}
+    input{width:100%;background:#16161e;border:1px solid #22222e;border-radius:6px;color:#e4e4f0;padding:.5rem .7rem;font-size:.85rem}
+    button[type=submit]{margin-top:.8rem;background:#7c3aed;border:none;border-radius:6px;color:#fff;padding:.5rem 1rem;cursor:pointer;font-size:.85rem}
+  </style>
+</head>
+<body>
+  <a href="/">← Volver al dashboard</a>
+  <h1>Gestión de usuarios</h1>
+  <table>
+    <thead><tr><th>Usuario</th><th>Creado</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <fieldset>
+    <legend>Agregar usuario</legend>
+    <form method="POST" action="/admin/users">
+      <label>Usuario</label>
+      <input type="text" name="username" required>
+      <label>Contraseña</label>
+      <input type="password" name="password" required minlength="8">
+      <button type="submit">Crear</button>
+    </form>
+  </fieldset>
+</body>
+</html>`);
+});
+
+app.post('/admin/users', requireAuth, async (req: Request, res: Response) => {
+    const { username, password } = req.body as { username: string; password: string };
+    if (username && password) {
+        const hash = await bcrypt.hash(password, 12);
+        try {
+            await query('INSERT INTO users (username, password_hash) VALUES ($1, $2)', [username, hash]);
+        } catch {
+            // duplicate username — redirect back silently
+        }
+    }
+    res.redirect('/admin/users');
+});
+
+app.post('/admin/users/:id/delete', requireAuth, async (req: Request, res: Response) => {
+    const targetId = Number(req.params.id);
+    if (targetId !== req.session.userId) {
+        await query('DELETE FROM users WHERE id = $1', [targetId]);
+    }
+    res.redirect('/admin/users');
+});
+
 // ---- SSE ----
 
 const sseClients = new Set<Response>();
