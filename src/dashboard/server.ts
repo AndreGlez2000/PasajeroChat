@@ -1,8 +1,8 @@
+/// <reference path="../auth/session.d.ts" />
 import express, { Request, Response } from 'express';
 import path from 'path';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
-import '../auth/session';
 import { requireAuth } from '../auth/middleware';
 import { query, dbReady } from '../db/connection';
 
