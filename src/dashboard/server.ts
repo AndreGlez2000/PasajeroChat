@@ -13,10 +13,14 @@ app.use(session({
     secret: process.env.SESSION_SECRET ?? 'dev-secret-change-in-prod',
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: true, sameSite: 'strict' },
+    cookie: { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' },
 }));
 
 const PORT = 3000;
+
+function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 function loginPage(error = ''): string {
     return `<!DOCTYPE html>
@@ -40,7 +44,7 @@ function loginPage(error = ''): string {
 <body>
   <div class="card">
     <h1>PasajeroChat · Dashboard</h1>
-    ${error ? `<p class="error">${error}</p>` : ''}
+    ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
     <form method="POST" action="/login">
       <label>Usuario</label>
       <input type="text" name="username" required autofocus>
@@ -60,24 +64,33 @@ app.get('/login', (_req: Request, res: Response) => {
 app.post('/login', async (req: Request, res: Response) => {
     const { username, password } = req.body as { username: string; password: string };
 
-    const result = await query(
-        'SELECT id, password_hash FROM users WHERE username = $1',
-        [username]
-    );
-
-    if (result.rows.length === 0) {
+    if (!username || !password) {
         res.send(loginPage('Usuario o contraseña incorrectos.'));
         return;
     }
 
-    const valid = await bcrypt.compare(password, result.rows[0].password_hash);
-    if (!valid) {
-        res.send(loginPage('Usuario o contraseña incorrectos.'));
-        return;
-    }
+    try {
+        const result = await query(
+            'SELECT id, password_hash FROM users WHERE username = $1',
+            [username]
+        );
 
-    req.session.userId = result.rows[0].id;
-    res.redirect('/');
+        if (result.rows.length === 0) {
+            res.send(loginPage('Usuario o contraseña incorrectos.'));
+            return;
+        }
+
+        const valid = await bcrypt.compare(password, result.rows[0].password_hash);
+        if (!valid) {
+            res.send(loginPage('Usuario o contraseña incorrectos.'));
+            return;
+        }
+
+        req.session.userId = result.rows[0].id;
+        res.redirect('/');
+    } catch {
+        res.send(loginPage('Error interno. Por favor intenta de nuevo.'));
+    }
 });
 
 app.post('/logout', (req: Request, res: Response) => {
