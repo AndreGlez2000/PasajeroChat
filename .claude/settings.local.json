@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(cd:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(cd \"C:\\\\Users\\\\andre\\\\code\\\\PasajeroChat\" && npx tsc --noEmit 2>&1)",
+      "Bash(cd /c/Users/andre/code/PasajeroChat && npm run seed 2>&1)",
+      "Bash(cd C:/Users/andre/code/PasajeroChat && npm test 2>&1)",
+      "Bash(cd /c/Users/andre/code/PasajeroChat && npm test 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\andre\\\\code\\\\PasajeroChat\" && npm test 2>&1)",
+      "Bash(cd C:\\\\Users\\\\andre\\\\code\\\\PasajeroChat:*)",
+      "Bash(cd C:/Users/andre/code/PasajeroChat && npm run add-admin -- --username admin --password test1234 2>&1)",
+      "Bash(echo Exit code: $?:*)",
+      "Bash(node:*)",
+      "Bash(cd /c/Users/andre/code/PasajeroChat && npx tsc --noEmit 2>&1)",
+      "Bash(cd C:/Users/andre/code/PasajeroChat && npx tsc --noEmit 2>&1)"
     ]
   }
 }
