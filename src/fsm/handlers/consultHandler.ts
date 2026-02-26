@@ -47,9 +47,9 @@ export async function handleConsult(psid: string, userState: UserState, text: st
             userState.state = 'menu';
             userState.data = { timestamp: Date.now() };
             return getMenuText();
-        } else {
-            return "Opción no válida.\n1. Regresar al menú";
         }
+
+        return "Opción no válida.\n1. Regresar al menú";
     }
 
     return "Error en el flujo de consulta.";
@@ -83,10 +83,12 @@ async function showResults(userState: UserState): Promise<string> {
         return `No hay reportes recientes activos para ${rutaNombre} (${variantName}).\n\n` + getMenuText();
     }
 
+    // Guardamos el reporte más reciente para poder confirmarlo
+    userState.data.report_id = res.rows[0].id;
+
     let response = `📋 Últimos avistamientos para ${userState.data.ruta_nombre} (${userState.data.variant_name}):\n\n`;
 
     res.rows.forEach((row: any) => {
-        // SQLite devuelve fechas como strings en formato UTC
         const reportedAt = new Date(row.reported_at + 'Z');
         const minutesAgo = Math.floor((Date.now() - reportedAt.getTime()) / 60000);
         const checks = '✅'.repeat(Math.min(row.confirm_count + 1, 3));

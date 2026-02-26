@@ -5,6 +5,7 @@ export type StateName =
     | 'aguardando_variante_sitt'
     | 'aguardando_variante_suburbaja'
     | 'aguardando_parada'
+    | 'confirmando_avistamiento'
     | 'consultando_ruta'
     | 'consultando_variante'
     | 'mostrando_resultados'
@@ -20,5 +21,6 @@ export interface UserState {
         variant_name?: string;
         stop_id?: number;
         stop_name?: string;
+        report_id?: number;
     };
 }

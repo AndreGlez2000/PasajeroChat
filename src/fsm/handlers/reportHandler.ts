@@ -1,6 +1,5 @@
 import { UserState } from '../types';
 import { query } from '../../db/connection';
-import { handleMenu } from './menuHandler';
 
 export async function handleReport(psid: string, userState: UserState, text: string): Promise<string> {
     const input = text.toUpperCase();
@@ -41,8 +40,33 @@ export async function handleReport(psid: string, userState: UserState, text: str
         const selectedVariant = res.rows[variantIndex - 1];
         userState.data.variant_id = selectedVariant.id;
         userState.data.variant_name = selectedVariant.name;
-        userState.state = 'aguardando_parada';
 
+        // Verificar si hay reporte reciente de otro usuario en esta variante
+        const recent = await query(
+            `SELECT r.id, s.name as stop_name, r.reported_at, r.confirm_count
+             FROM reports r
+             JOIN stops s ON r.stop_id = s.id
+             WHERE r.variant_id = $1
+               AND r.is_active = 1
+               AND r.expires_at > datetime('now')
+               AND r.user_psid != $2
+             ORDER BY r.reported_at DESC LIMIT 1`,
+            [selectedVariant.id, psid]
+        );
+
+        if (recent.rows.length > 0) {
+            const row = recent.rows[0];
+            const reportedAt = new Date(row.reported_at + 'Z');
+            const minutesAgo = Math.floor((Date.now() - reportedAt.getTime()) / 60000);
+            const checks = '✅'.repeat(Math.min(row.confirm_count + 1, 3));
+
+            userState.data.report_id = row.id;
+            userState.state = 'confirmando_avistamiento';
+
+            return `Ya hay un avistamiento reciente:\n\n• ${row.stop_name} - hace ${minutesAgo} min ${checks}\n\n1. Confirmar este avistamiento\n2. Reportar en otra parada`;
+        }
+
+        userState.state = 'aguardando_parada';
         return await getStopsMenu(selectedVariant.id);
     }
 
@@ -75,8 +99,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
             const minutesLeft = 10 - Math.floor((Date.now() - lastReport.getTime()) / 60000);
             userState.state = 'menu';
             userState.data = { timestamp: Date.now() };
-            const spamMsg = `⏳ Ya reportaste recientemente. Por favor espera ${minutesLeft} minutos más para volver a reportar.\n`;
-            return spamMsg + "\n" + (await handleMenu(psid, userState, ''));
+            return `⏳ Ya reportaste recientemente. Por favor espera ${minutesLeft} minutos más para volver a reportar.\n\n¿Qué deseas hacer?\n2. Consultar última vez visto\n3. Ver mapas`;
         }
 
         // Guardando Reporte
@@ -88,10 +111,82 @@ export async function handleReport(psid: string, userState: UserState, text: str
 
         const rutaNombre = userState.data.ruta_nombre;
         const variantName = userState.data.variant_name;
-        userState.state = 'menu';
-        userState.data = { timestamp: Date.now() };
-        const successMsg = `¡Reporte guardado exitosamente!\n🚌 ${rutaNombre} (${variantName})\n📍 ${selectedStop.name}\n\n¡Gracias por ayudar a la comunidad!\n`;
-        return successMsg + "\n" + (await handleMenu(psid, userState, ''));
+
+        // Mostrar avistamientos recientes de la misma variante
+        const recent = await query(
+            `SELECT s.name as stop_name, r.reported_at, r.confirm_count
+             FROM reports r
+             JOIN stops s ON r.stop_id = s.id
+             WHERE r.variant_id = $1 AND r.is_active = 1 AND r.expires_at > datetime('now')
+             ORDER BY r.reported_at DESC LIMIT 5`,
+            [userState.data.variant_id]
+        );
+
+        let successMsg = `¡Reporte guardado exitosamente!\n🚌 ${rutaNombre} (${variantName})\n📍 ${selectedStop.name}\n\n¡Gracias por ayudar a la comunidad!\n`;
+
+        if (recent.rows.length > 0) {
+            successMsg += `\n📋 Avistamientos activos en esta ruta:\n\n`;
+            recent.rows.forEach((row: any) => {
+                const reportedAt = new Date(row.reported_at + 'Z');
+                const minutesAgo = Math.floor((Date.now() - reportedAt.getTime()) / 60000);
+                const checks = '✅'.repeat(Math.min(row.confirm_count + 1, 3));
+                successMsg += `• ${row.stop_name} - hace ${minutesAgo} min ${checks}\n`;
+            });
+        }
+
+        successMsg += `\n1. Regresar al menú`;
+        userState.state = 'mostrando_resultados';
+        userState.data.timestamp = Date.now();
+        return successMsg;
+    }
+
+    if (userState.state === 'confirmando_avistamiento') {
+        if (input === '1') {
+            const reportId = userState.data.report_id!;
+
+            // Verificar que sigue activo
+            const reportRes = await query(
+                `SELECT id FROM reports WHERE id = $1 AND is_active = 1 AND expires_at > datetime('now')`,
+                [reportId]
+            );
+
+            if (reportRes.rows.length === 0) {
+                userState.state = 'aguardando_parada';
+                return `Ese avistamiento ya expiró.\n\n` + await getStopsMenu(userState.data.variant_id!);
+            }
+
+            // Anti-duplicado
+            const alreadyConfirmed = await query(
+                `SELECT id FROM confirmations WHERE report_id = $1 AND user_psid = $2`,
+                [reportId, psid]
+            );
+
+            if (alreadyConfirmed.rows.length > 0) {
+                userState.state = 'menu';
+                userState.data = { timestamp: Date.now() };
+                return `Ya confirmaste este avistamiento anteriormente.\n\n¡Hola! ¿Qué deseas hacer?\n1. Reportar avistamiento\n2. Consultar última vez visto\n3. Ver mapas`;
+            }
+
+            await query(
+                `INSERT INTO confirmations (report_id, user_psid) VALUES ($1, $2)`,
+                [reportId, psid]
+            );
+            await query(
+                `UPDATE reports SET confirm_count = confirm_count + 1 WHERE id = $1`,
+                [reportId]
+            );
+
+            userState.state = 'menu';
+            userState.data = { timestamp: Date.now() };
+            return `¡Gracias por confirmar! Tu aporte ayuda a la comunidad. 🙌\n\n¡Hola! ¿Qué deseas hacer?\n1. Reportar avistamiento\n2. Consultar última vez visto\n3. Ver mapas`;
+        }
+
+        if (input === '2') {
+            userState.state = 'aguardando_parada';
+            return await getStopsMenu(userState.data.variant_id!);
+        }
+
+        return `Opción no válida.\n1. Confirmar este avistamiento\n2. Reportar en otra parada`;
     }
 
     return "Error en el flujo de reporte.";

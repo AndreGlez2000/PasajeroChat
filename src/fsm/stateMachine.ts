@@ -48,6 +48,7 @@ export async function handleMessage(psid: string, text: string): Promise<string>
             case 'aguardando_variante_sitt':
             case 'aguardando_variante_suburbaja':
             case 'aguardando_parada':
+            case 'confirmando_avistamiento':
                 response = await handleReport(psid, userState, text);
                 break;
 
