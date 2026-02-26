@@ -328,13 +328,14 @@ app.get('/api/analytics/route-coverage', async (_req: Request, res: Response) =>
 // ---- Admin: User management ----
 
 app.get('/admin/users', requireAuth, async (req: Request, res: Response) => {
-    const result = await query(
-        'SELECT id, username, created_at FROM users ORDER BY created_at ASC',
-        []
-    );
-    const currentId = req.session.userId;
+    try {
+        const result = await query(
+            'SELECT id, username, created_at FROM users ORDER BY created_at ASC',
+            []
+        );
+        const currentId = req.session.userId;
 
-    const rows = result.rows.map((u: any) => `
+        const rows = result.rows.map((u: any) => `
         <tr>
             <td>${escapeHtml(String(u.username))}</td>
             <td>${escapeHtml(String(u.created_at))}</td>
@@ -387,11 +388,14 @@ app.get('/admin/users', requireAuth, async (req: Request, res: Response) => {
   </fieldset>
 </body>
 </html>`);
+    } catch {
+        res.status(500).send('Error interno al cargar usuarios.');
+    }
 });
 
 app.post('/admin/users', requireAuth, async (req: Request, res: Response) => {
     const { username, password } = req.body as { username: string; password: string };
-    if (username && password) {
+    if (username && password && password.length >= 8 && password.length <= 72) {
         const hash = await bcrypt.hash(password, 12);
         try {
             await query('INSERT INTO users (username, password_hash) VALUES ($1, $2)', [username, hash]);
@@ -404,6 +408,10 @@ app.post('/admin/users', requireAuth, async (req: Request, res: Response) => {
 
 app.post('/admin/users/:id/delete', requireAuth, async (req: Request, res: Response) => {
     const targetId = Number(req.params.id);
+    if (!Number.isInteger(targetId) || targetId <= 0) {
+        res.redirect('/admin/users');
+        return;
+    }
     if (targetId !== req.session.userId) {
         await query('DELETE FROM users WHERE id = $1', [targetId]);
     }
