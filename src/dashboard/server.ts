@@ -1,11 +1,88 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import session from 'express-session';
+import bcrypt from 'bcrypt';
+import '../auth/session';
+import { requireAuth } from '../auth/middleware';
 import { query, dbReady } from '../db/connection';
 
 const app = express();
+
+app.use(express.urlencoded({ extended: false }));
+app.use(session({
+    secret: process.env.SESSION_SECRET ?? 'dev-secret-change-in-prod',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { httpOnly: true, sameSite: 'strict' },
+}));
+
 const PORT = 3000;
 
-app.use(express.static(path.join(__dirname, 'public')));
+function loginPage(error = ''): string {
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>PasajeroChat · Login</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#09090e;color:#e4e4f0;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .card{background:#101016;border:1px solid #22222e;border-radius:12px;padding:2rem;width:100%;max-width:360px}
+    h1{font-size:1.1rem;font-weight:600;margin-bottom:1.5rem}
+    label{display:block;font-size:.8rem;color:#8080a0;margin-bottom:.3rem}
+    input{width:100%;background:#16161e;border:1px solid #22222e;border-radius:6px;color:#e4e4f0;padding:.6rem .8rem;font-size:.9rem;margin-bottom:1rem;outline:none}
+    input:focus{border-color:#7c3aed}
+    button{width:100%;background:#7c3aed;border:none;border-radius:6px;color:#fff;padding:.7rem;font-size:.9rem;font-weight:500;cursor:pointer}
+    button:hover{background:#6d28d9}
+    .error{color:#ef4444;font-size:.8rem;margin-bottom:1rem}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>PasajeroChat · Dashboard</h1>
+    ${error ? `<p class="error">${error}</p>` : ''}
+    <form method="POST" action="/login">
+      <label>Usuario</label>
+      <input type="text" name="username" required autofocus>
+      <label>Contraseña</label>
+      <input type="password" name="password" required>
+      <button type="submit">Entrar</button>
+    </form>
+  </div>
+</body>
+</html>`;
+}
+
+app.get('/login', (_req: Request, res: Response) => {
+    res.send(loginPage());
+});
+
+app.post('/login', async (req: Request, res: Response) => {
+    const { username, password } = req.body as { username: string; password: string };
+
+    const result = await query(
+        'SELECT id, password_hash FROM users WHERE username = $1',
+        [username]
+    );
+
+    if (result.rows.length === 0) {
+        res.send(loginPage('Usuario o contraseña incorrectos.'));
+        return;
+    }
+
+    const valid = await bcrypt.compare(password, result.rows[0].password_hash);
+    if (!valid) {
+        res.send(loginPage('Usuario o contraseña incorrectos.'));
+        return;
+    }
+
+    req.session.userId = result.rows[0].id;
+    res.redirect('/');
+});
+
+app.post('/logout', (req: Request, res: Response) => {
+    req.session.destroy(() => res.redirect('/login'));
+});
 
 // ---- Data helpers ----
 
@@ -185,6 +262,9 @@ async function getAllDashboardData() {
 }
 
 // ---- REST Endpoints ----
+
+app.use(requireAuth, express.static(path.join(__dirname, 'public')));
+app.use('/api', requireAuth);
 
 app.get('/api/summary', async (_req: Request, res: Response) => {
     try { res.json(await getSummary()); }
