@@ -8,6 +8,7 @@ npm run start:dashboard  # admin dashboard at http://localhost:3000
 npm run seed             # reset DB and repopulate routes/variants/stops
 npm run db:reset         # clear reports only, keep routes/stops intact
 npm test                 # run vitest suite
+npm run add-admin -- --username <u> --password <p>   # create dashboard admin user
 ```
 
 TypeScript runs via `ts-node` — no build step in development.
@@ -76,6 +77,26 @@ confirmations   — reserved, not used
 ### Admin dashboard
 
 `src/dashboard/server.ts` serves a real-time operations panel via SSE (10-second push interval). It exposes REST endpoints under `/api/` for all metrics. The frontend in `src/dashboard/public/` renders without any framework.
+
+The dashboard is protected by session-based authentication (`express-session` + `bcrypt`). All routes except `/webhook` require a valid session.
+
+**Auth files:**
+- `src/auth/middleware.ts` — `requireAuth` Express middleware (redirects to `/login` if no session)
+- `src/auth/session.d.ts` — TypeScript module augmentation adding `userId: number` to `SessionData`. Referenced via triple-slash directive (`/// <reference path="../auth/session.d.ts" />`) at the top of `server.ts` — do NOT import it as a module (it has no JS runtime equivalent)
+- `src/auth/middleware.test.ts` — 2 vitest tests for `requireAuth`
+- `src/scripts/add-admin.ts` — CLI to create admin users: `npm run add-admin -- --username <u> --password <p>`
+
+**Auth routes:**
+- `GET /login` — login form
+- `POST /login` — verify credentials, create session
+- `POST /logout` — destroy session, redirect to `/login`
+- `GET /admin/users` — list users + create-user form
+- `POST /admin/users` — create new user (password 8–72 chars)
+- `POST /admin/users/:id/delete` — delete user (cannot delete self)
+
+**Database:** `users` table in `src/db/schema.sql` with `id, username, password_hash, created_at`. Passwords hashed with bcrypt cost 12. The seed script does NOT touch the users table — users survive `npm run seed`.
+
+**Session secret** stored in `.env` as `SESSION_SECRET`. The `.env` file is NOT tracked in git (`git rm --cached .env` was run). Set this variable in your environment before running the dashboard.
 
 ### Entry point
 
