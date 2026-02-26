@@ -9,6 +9,7 @@
     "start:webhook": "ts-node src/webhook.ts",
     "seed": "ts-node src/scripts/seed.ts",
     "db:reset": "ts-node src/scripts/reset.ts",
+    "add-admin": "ts-node src/scripts/add-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
