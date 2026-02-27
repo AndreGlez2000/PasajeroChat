@@ -12,6 +12,7 @@ const VERIFY_TOKEN      = process.env.VERIFY_TOKEN      ?? '';
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN ?? '';
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -157,7 +158,13 @@ app.post('/login', async (req: Request, res: Response) => {
         }
 
         req.session.userId = result.rows[0].id;
-        res.redirect('/');
+        req.session.save((err) => {
+            if (err) {
+                res.send(loginPage('Error de sesión. Por favor intenta de nuevo.'));
+                return;
+            }
+            res.redirect('/');
+        });
     } catch {
         res.send(loginPage('Error interno. Por favor intenta de nuevo.'));
     }

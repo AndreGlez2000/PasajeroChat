@@ -79,17 +79,10 @@ async function runSeed() {
     console.log('Iniciando seed de la base de datos...');
 
     try {
-        // Leer y ejecutar schema.sql (una sentencia a la vez)
+        // Leer y ejecutar schema.sql completo
         const schemaPath = path.join(__dirname, '../db/schema.sql');
         const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-        const statements = schemaSql
-            .split(';')
-            .map(s => s.trim())
-            .filter(s => s.length > 0 && !s.startsWith('--'));
-
-        for (const stmt of statements) {
-            await query(stmt);
-        }
+        await query(schemaSql);
         console.log('Schema creado correctamente.');
 
         // Limpiar tablas
