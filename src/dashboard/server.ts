@@ -126,6 +126,25 @@ async function sendMessage(psid: string, text: string): Promise<void> {
     }
 }
 
+// ---- Public pages ----
+
+app.get('/privacy', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Política de Privacidad — PasajeroChat</title><style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:0 20px;color:#222}</style></head><body>
+<h1>Política de Privacidad — PasajeroChat</h1>
+<p><strong>Última actualización:</strong> febrero 2026</p>
+<p>PasajeroChat es un chatbot de información de transporte público para pasajeros en Tijuana, Baja California.</p>
+<h2>Datos que recopilamos</h2>
+<p>Utilizamos únicamente tu identificador de Messenger (PSID) para mantener el contexto de la conversación activa. No almacenamos tu nombre, foto de perfil ni ningún otro dato personal.</p>
+<h2>Reportes de avistamiento</h2>
+<p>Los reportes que envías (ruta, parada, hora) son anónimos y se eliminan automáticamente después de 90 minutos.</p>
+<h2>Uso de datos</h2>
+<p>Los datos recopilados se usan exclusivamente para responder tus consultas dentro del chatbot. No se comparten con terceros ni se usan con fines comerciales.</p>
+<h2>Contacto</h2>
+<p>Para cualquier pregunta sobre esta política escríbenos a: <a href="mailto:andre.gonzalez2000@hotmail.com">andre.gonzalez2000@hotmail.com</a></p>
+</body></html>`);
+});
+
 // ---- Auth ----
 
 app.get('/login', (_req: Request, res: Response) => {
