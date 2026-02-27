@@ -287,7 +287,7 @@ async function getHourlyHistorical() {
     const [historical, today] = await Promise.all([
         query(`
             SELECT EXTRACT(HOUR FROM reported_at)::text as hour,
-                   ROUND(COUNT(*)::FLOAT / 30, 1) as avg_count
+                   ROUND((COUNT(*)::NUMERIC / 30), 1) as avg_count
             FROM reports
             WHERE reported_at > NOW() - INTERVAL '30 days'
             GROUP BY hour
