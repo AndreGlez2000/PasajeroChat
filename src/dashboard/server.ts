@@ -145,6 +145,31 @@ app.get('/privacy', (_req: Request, res: Response) => {
 </body></html>`);
 });
 
+app.get('/terms', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Condiciones del Servicio — PasajeroChat</title><style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:0 20px;color:#222}</style></head><body>
+<h1>Condiciones del Servicio — PasajeroChat</h1>
+<p><strong>Última actualización:</strong> febrero 2026</p>
+<h2>1. Descripción del servicio</h2>
+<p>PasajeroChat es un chatbot gratuito de información de transporte público para pasajeros en Tijuana, Baja California. Permite reportar y consultar avistamientos de autobuses de las rutas Violeta, SITT y Suburbaja.</p>
+<h2>2. Uso aceptable</h2>
+<p>Al usar PasajeroChat aceptas:</p>
+<ul>
+<li>Reportar únicamente avistamientos reales y verídicos.</li>
+<li>No usar el servicio para enviar spam, contenido ofensivo ni información falsa.</li>
+<li>No intentar explotar, sobrecargar ni interferir con el funcionamiento del servicio.</li>
+</ul>
+<h2>3. Limitación de responsabilidad</h2>
+<p>PasajeroChat es un servicio comunitario informativo. La información proviene de reportes de usuarios y puede no ser exacta. No nos responsabilizamos por decisiones tomadas con base en la información proporcionada.</p>
+<h2>4. Disponibilidad</h2>
+<p>El servicio se ofrece "tal cual" y puede interrumpirse temporalmente por mantenimiento o causas ajenas a nuestro control.</p>
+<h2>5. Modificaciones</h2>
+<p>Nos reservamos el derecho de modificar estas condiciones en cualquier momento. El uso continuado del servicio implica la aceptación de los cambios.</p>
+<h2>Contacto</h2>
+<p><a href="mailto:andre.gonzalez2000@hotmail.com">andre.gonzalez2000@hotmail.com</a></p>
+</body></html>`);
+});
+
 // ---- Auth ----
 
 app.get('/login', (_req: Request, res: Response) => {
