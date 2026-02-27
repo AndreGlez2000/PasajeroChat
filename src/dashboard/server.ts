@@ -501,7 +501,7 @@ app.get('/api/sse', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     sseClients.add(res);
@@ -510,7 +510,12 @@ app.get('/api/sse', (req: Request, res: Response) => {
         res.write(`event: data-update\ndata: ${JSON.stringify(data)}\n\n`);
     });
 
-    req.on('close', () => { sseClients.delete(res); });
+    const heartbeat = setInterval(() => { res.write(': keepalive\n\n'); }, 25_000);
+
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        sseClients.delete(res);
+    });
 });
 
 setInterval(async () => {
