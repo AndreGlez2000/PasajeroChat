@@ -23,11 +23,9 @@ const ROUTE_COLORS = {
 // Utilities
 // ================================================================
 
-// SQLite stores datetimes as UTC without timezone info ("YYYY-MM-DD HH:MM:SS").
-// Without the 'Z' suffix, JS parses them as local time → wrong timestamps.
 function parseUtc(dateStr) {
     if (!dateStr) return null;
-    return new Date(dateStr.replace(' ', 'T') + 'Z');
+    return new Date(dateStr);
 }
 
 function timeAgo(dateStr) {

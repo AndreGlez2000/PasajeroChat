@@ -3,8 +3,9 @@
 ## Commands
 
 ```bash
+npm start                # combined server (webhook + dashboard) — used by Railway
 npm run start:terminal   # interactive test harness (stdin → FSM → stdout)
-npm run start:dashboard  # admin dashboard at http://localhost:3000
+npm run start:dashboard  # same as npm start — webhook + dashboard on PORT
 npm run seed             # reset DB and repopulate routes/variants/stops
 npm run db:reset         # clear reports only, keep routes/stops intact
 npm test                 # run vitest suite
@@ -56,13 +57,13 @@ Invalid input in any state keeps the state unchanged and shows an error message.
 **Business rules:**
 
 - Anti-spam: 1 report per user per 10 minutes. Remaining wait time is calculated and shown.
-- Reports expire after 90 minutes via `expires_at`. Queries filter on `is_active = 1 AND expires_at > datetime('now')`.
+- Reports expire after 90 minutes via `expires_at`. Queries filter on `is_active = true AND expires_at > NOW()`.
 - Session timeout: 30 minutes of inactivity resets to `menu`.
 - The "Yo también la vi" confirmation flow was removed from the FSM. The `confirm_count` column and `confirmations` table still exist in the schema but are not written to by any current handler.
 
 ### Database
 
-SQLite via `sqlite3` module, wrapped in a Promise-based `query()` helper in `src/db/connection.ts`.
+PostgreSQL via `pg` module (`Pool`), wrapped in a Promise-based `query()` helper in `src/db/connection.ts`. Connection string via `DATABASE_URL` env var. SSL enabled in production (`NODE_ENV=production`).
 
 ```
 routes          — transportation companies (Violeta, SITT, Suburbaja)
@@ -70,9 +71,16 @@ route_variants  — directional variants per route (Ida / Vuelta)
 stops           — stops per variant, ordered by stop_number
 reports         — sighting reports (90-minute expiration)
 confirmations   — reserved, not used
+users           — dashboard admin users (bcrypt passwords)
 ```
 
-**Important:** SQLite stores `CURRENT_TIMESTAMP` as UTC without timezone info (`"YYYY-MM-DD HH:MM:SS"`). JavaScript's `new Date()` treats this as local time, producing wrong timestamps. Always parse with `new Date(str.replace(' ', 'T') + 'Z')`. The existing code in `reportHandler.ts` and `dashboard/public/app.js` already does this.
+**Important:** PostgreSQL returns `TIMESTAMPTZ` columns as proper JavaScript `Date` objects (serialized as ISO strings in JSON). Do NOT add `+ 'Z'` or `.replace(' ', 'T')` hacks — `new Date(row.timestamp)` works directly.
+
+**Date/time syntax:** Use `NOW()`, `NOW() - INTERVAL '10 minutes'`, `NOW() + INTERVAL '90 minutes'`. Use `EXTRACT(HOUR FROM col)` instead of `strftime`. Use `FLOOR(EXTRACT(EPOCH FROM (NOW() - col)) / 60)::INTEGER` for minute differences.
+
+**Schema types:** `SERIAL PRIMARY KEY`, `TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP`, `BOOLEAN DEFAULT true`.
+
+**Deploy:** Un solo servicio Railway corre webhook + dashboard juntos (`npm start` → `ts-node src/dashboard/server.ts`). Required env vars: `DATABASE_URL`, `SESSION_SECRET`, `NODE_ENV=production`, `VERIFY_TOKEN`, `PAGE_ACCESS_TOKEN`. `PORT` lo asigna Railway automáticamente.
 
 ### Admin dashboard
 

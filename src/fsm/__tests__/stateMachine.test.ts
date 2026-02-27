@@ -3,7 +3,7 @@ import { vi, describe, it, expect, afterEach } from 'vitest';
 // Mockear la BD antes de importar cualquier módulo que la use
 vi.mock('../../db/connection', () => ({
     query: vi.fn(),
-    db: {},
+    pool: {},
 }));
 
 import { handleMessage } from '../stateMachine';

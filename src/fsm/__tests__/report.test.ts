@@ -2,7 +2,7 @@ import { vi, describe, it, expect, afterEach } from 'vitest';
 
 vi.mock('../../db/connection', () => ({
     query: vi.fn(),
-    db: {},
+    pool: {},
 }));
 
 import { handleMessage } from '../stateMachine';
@@ -166,7 +166,7 @@ describe('guardado del reporte', () => {
         await setupToStopState(psid);
 
         // Reporte hace 5 minutos → faltan 5 minutos
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString().replace('Z', '');
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 1, name: 'Zona Centro' }] }) // SELECT stops

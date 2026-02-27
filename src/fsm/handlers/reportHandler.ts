@@ -47,8 +47,8 @@ export async function handleReport(psid: string, userState: UserState, text: str
              FROM reports r
              JOIN stops s ON r.stop_id = s.id
              WHERE r.variant_id = $1
-               AND r.is_active = 1
-               AND r.expires_at > datetime('now')
+               AND r.is_active = true
+               AND r.expires_at > NOW()
                AND r.user_psid != $2
              ORDER BY r.reported_at DESC LIMIT 1`,
             [selectedVariant.id, psid]
@@ -56,7 +56,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
 
         if (recent.rows.length > 0) {
             const row = recent.rows[0];
-            const reportedAt = new Date(row.reported_at + 'Z');
+            const reportedAt = new Date(row.reported_at);
             const minutesAgo = Math.floor((Date.now() - reportedAt.getTime()) / 60000);
             const checks = '✅'.repeat(Math.min(row.confirm_count + 1, 3));
 
@@ -87,15 +87,14 @@ export async function handleReport(psid: string, userState: UserState, text: str
         
         // Validando Spam
         const spamCheck = await query(
-            `SELECT reported_at FROM reports 
-             WHERE user_psid = $1 AND reported_at > datetime('now', '-10 minutes')
+            `SELECT reported_at FROM reports
+             WHERE user_psid = $1 AND reported_at > NOW() - INTERVAL '10 minutes'
              ORDER BY reported_at DESC LIMIT 1`,
             [psid]
         );
 
         if (spamCheck.rows.length > 0) {
-            // SQLite devuelve fechas como strings en formato UTC
-            const lastReport = new Date(spamCheck.rows[0].reported_at + 'Z');
+            const lastReport = new Date(spamCheck.rows[0].reported_at);
             const minutesLeft = 10 - Math.floor((Date.now() - lastReport.getTime()) / 60000);
             userState.state = 'menu';
             userState.data = { timestamp: Date.now() };
@@ -104,8 +103,8 @@ export async function handleReport(psid: string, userState: UserState, text: str
 
         // Guardando Reporte
         await query(
-            `INSERT INTO reports (variant_id, stop_id, user_psid, expires_at) 
-             VALUES ($1, $2, $3, datetime('now', '+90 minutes'))`,
+            `INSERT INTO reports (variant_id, stop_id, user_psid, expires_at)
+             VALUES ($1, $2, $3, NOW() + INTERVAL '90 minutes')`,
             [userState.data.variant_id, selectedStop.id, psid]
         );
 
@@ -117,7 +116,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
             `SELECT s.name as stop_name, r.reported_at, r.confirm_count
              FROM reports r
              JOIN stops s ON r.stop_id = s.id
-             WHERE r.variant_id = $1 AND r.is_active = 1 AND r.expires_at > datetime('now')
+             WHERE r.variant_id = $1 AND r.is_active = true AND r.expires_at > NOW()
              ORDER BY r.reported_at DESC LIMIT 5`,
             [userState.data.variant_id]
         );
@@ -127,7 +126,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
         if (recent.rows.length > 0) {
             successMsg += `\n📋 Avistamientos activos en esta ruta:\n\n`;
             recent.rows.forEach((row: any) => {
-                const reportedAt = new Date(row.reported_at + 'Z');
+                const reportedAt = new Date(row.reported_at);
                 const minutesAgo = Math.floor((Date.now() - reportedAt.getTime()) / 60000);
                 const checks = '✅'.repeat(Math.min(row.confirm_count + 1, 3));
                 successMsg += `• ${row.stop_name} - hace ${minutesAgo} min ${checks}\n`;
@@ -146,7 +145,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
 
             // Verificar que sigue activo
             const reportRes = await query(
-                `SELECT id FROM reports WHERE id = $1 AND is_active = 1 AND expires_at > datetime('now')`,
+                `SELECT id FROM reports WHERE id = $1 AND is_active = true AND expires_at > NOW()`,
                 [reportId]
             );
 

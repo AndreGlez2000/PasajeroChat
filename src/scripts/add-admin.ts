@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
-import { query, db } from '../db/connection';
+import { query, pool } from '../db/connection';
 
 async function main() {
     const args = process.argv.slice(2);
@@ -36,7 +36,7 @@ async function main() {
         }
         process.exit(1);
     } finally {
-        db.close();
+        await pool.end();
     }
 }
 

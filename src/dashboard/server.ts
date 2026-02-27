@@ -1,13 +1,19 @@
 /// <reference path="../auth/session.d.ts" />
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
 import { requireAuth } from '../auth/middleware';
 import { query, dbReady } from '../db/connection';
+import { handleMessage } from '../fsm/stateMachine';
+
+const VERIFY_TOKEN      = process.env.VERIFY_TOKEN      ?? '';
+const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN ?? '';
 
 const app = express();
 
+app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(session({
     secret: process.env.SESSION_SECRET ?? 'dev-secret-change-in-prod',
@@ -16,7 +22,7 @@ app.use(session({
     cookie: { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' },
 }));
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 function escapeHtml(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -56,6 +62,70 @@ function loginPage(error = ''): string {
 </body>
 </html>`;
 }
+
+// ---- Webhook (Facebook Messenger) ----
+
+app.get('/webhook', (req: Request, res: Response) => {
+    const mode      = req.query['hub.mode'];
+    const token     = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+        console.log('[Webhook] Verificación exitosa');
+        res.status(200).send(challenge);
+    } else {
+        console.warn('[Webhook] Verificación fallida — token incorrecto');
+        res.sendStatus(403);
+    }
+});
+
+app.post('/webhook', async (req: Request, res: Response) => {
+    const body = req.body;
+
+    if (body.object !== 'page') {
+        res.sendStatus(404);
+        return;
+    }
+
+    res.sendStatus(200);
+
+    for (const entry of body.entry ?? []) {
+        for (const event of entry.messaging ?? []) {
+            const psid = event.sender?.id as string | undefined;
+            if (!psid || !event.message?.text) continue;
+
+            const text = (event.message.text as string).trim();
+            console.log(`[Webhook] psid=${psid} texto="${text}"`);
+
+            try {
+                const reply = await handleMessage(psid, text);
+                await sendMessage(psid, reply);
+            } catch (err) {
+                console.error(`[Webhook] Error procesando mensaje de ${psid}:`, err);
+            }
+        }
+    }
+});
+
+async function sendMessage(psid: string, text: string): Promise<void> {
+    if (!PAGE_ACCESS_TOKEN) {
+        console.warn('[Webhook] PAGE_ACCESS_TOKEN no configurado — respuesta no enviada');
+        return;
+    }
+
+    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+    const res = await fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ recipient: { id: psid }, message: { text } }),
+    });
+
+    if (!res.ok) {
+        console.error(`[Webhook] Send API error ${res.status}:`, await res.text());
+    }
+}
+
+// ---- Auth ----
 
 app.get('/login', (_req: Request, res: Response) => {
     res.send(loginPage());
@@ -101,10 +171,10 @@ app.post('/logout', (req: Request, res: Response) => {
 
 async function getSummary() {
     const [active, today, users, lastHour] = await Promise.all([
-        query(`SELECT COUNT(*) as total FROM reports WHERE is_active=1 AND expires_at > datetime('now')`),
-        query(`SELECT COUNT(*) as total FROM reports WHERE reported_at > datetime('now', '-1 day')`),
-        query(`SELECT COUNT(DISTINCT user_psid) as total FROM reports WHERE reported_at > datetime('now', '-1 day')`),
-        query(`SELECT COUNT(*) as total FROM reports WHERE reported_at > datetime('now', '-1 hour')`),
+        query(`SELECT COUNT(*) as total FROM reports WHERE is_active=true AND expires_at > NOW()`),
+        query(`SELECT COUNT(*) as total FROM reports WHERE reported_at > NOW() - INTERVAL '1 day'`),
+        query(`SELECT COUNT(DISTINCT user_psid) as total FROM reports WHERE reported_at > NOW() - INTERVAL '1 day'`),
+        query(`SELECT COUNT(*) as total FROM reports WHERE reported_at > NOW() - INTERVAL '1 hour'`),
     ]);
     return {
         activeNow:        active.rows[0]?.total ?? 0,
@@ -122,7 +192,7 @@ async function getActiveReports() {
         JOIN route_variants rv ON r.variant_id = rv.id
         JOIN routes ro ON rv.route_id = ro.id
         JOIN stops s ON r.stop_id = s.id
-        WHERE r.is_active = 1 AND r.expires_at > datetime('now')
+        WHERE r.is_active = true AND r.expires_at > NOW()
         ORDER BY r.reported_at DESC
     `);
     return result.rows;
@@ -148,7 +218,7 @@ async function getByRoute() {
         FROM reports r
         JOIN route_variants rv ON r.variant_id = rv.id
         JOIN routes ro ON rv.route_id = ro.id
-        WHERE r.reported_at > datetime('now', '-7 days')
+        WHERE r.reported_at > NOW() - INTERVAL '7 days'
         GROUP BY ro.id, ro.name
         ORDER BY count DESC
     `);
@@ -157,9 +227,9 @@ async function getByRoute() {
 
 async function getByHour() {
     const result = await query(`
-        SELECT strftime('%H', reported_at) as hour, COUNT(*) as count
+        SELECT EXTRACT(HOUR FROM reported_at)::text as hour, COUNT(*) as count
         FROM reports
-        WHERE reported_at > datetime('now', '-24 hours')
+        WHERE reported_at > NOW() - INTERVAL '24 hours'
         GROUP BY hour
         ORDER BY hour
     `);
@@ -182,9 +252,7 @@ async function getTopStops() {
 
 async function getSystemSilence(): Promise<number | null> {
     const result = await query(`
-        SELECT CAST(
-            (julianday('now') - julianday(MAX(reported_at))) * 24 * 60
-        AS INTEGER) as minutes_ago
+        SELECT FLOOR(EXTRACT(EPOCH FROM (NOW() - MAX(reported_at))) / 60)::INTEGER as minutes_ago
         FROM reports
     `);
     return result.rows[0]?.minutes_ago ?? null;
@@ -196,12 +264,12 @@ async function getSuspiciousUsers() {
         SELECT
             user_psid,
             COUNT(*) as reports_24h,
-            SUM(CASE WHEN reported_at > datetime('now', '-1 hour') THEN 1 ELSE 0 END) as reports_1h,
+            SUM(CASE WHEN reported_at > NOW() - INTERVAL '1 hour' THEN 1 ELSE 0 END) as reports_1h,
             MAX(reported_at) as last_activity
         FROM reports
-        WHERE reported_at > datetime('now', '-24 hours')
+        WHERE reported_at > NOW() - INTERVAL '24 hours'
         GROUP BY user_psid
-        HAVING reports_24h > 5 OR reports_1h > 2
+        HAVING COUNT(*) > 5 OR SUM(CASE WHEN reported_at > NOW() - INTERVAL '1 hour' THEN 1 ELSE 0 END) > 2
         ORDER BY reports_24h DESC
         LIMIT 10
     `);
@@ -211,17 +279,17 @@ async function getSuspiciousUsers() {
 async function getHourlyHistorical() {
     const [historical, today] = await Promise.all([
         query(`
-            SELECT strftime('%H', reported_at) as hour,
-                   ROUND(CAST(COUNT(*) AS FLOAT) / 30, 1) as avg_count
+            SELECT EXTRACT(HOUR FROM reported_at)::text as hour,
+                   ROUND(COUNT(*)::FLOAT / 30, 1) as avg_count
             FROM reports
-            WHERE reported_at > datetime('now', '-30 days')
+            WHERE reported_at > NOW() - INTERVAL '30 days'
             GROUP BY hour
             ORDER BY hour
         `),
         query(`
-            SELECT strftime('%H', reported_at) as hour, COUNT(*) as count
+            SELECT EXTRACT(HOUR FROM reported_at)::text as hour, COUNT(*) as count
             FROM reports
-            WHERE reported_at > datetime('now', '-24 hours')
+            WHERE reported_at > NOW() - INTERVAL '24 hours'
             GROUP BY hour
             ORDER BY hour
         `),
@@ -239,12 +307,12 @@ async function getRouteCoverage() {
             MAX(r.reported_at) as last_report,
             CASE
                 WHEN MAX(r.reported_at) IS NULL THEN NULL
-                ELSE CAST((julianday('now') - julianday(MAX(r.reported_at))) * 24 AS INTEGER)
+                ELSE FLOOR(EXTRACT(EPOCH FROM (NOW() - MAX(r.reported_at))) / 3600)::INTEGER
             END as hours_since_last
         FROM routes ro
         LEFT JOIN route_variants rv ON rv.route_id = ro.id
         LEFT JOIN reports r ON r.variant_id = rv.id
-            AND r.reported_at > datetime('now', '-7 days')
+            AND r.reported_at > NOW() - INTERVAL '7 days'
         GROUP BY ro.id, ro.name
         ORDER BY total_reports DESC
     `);

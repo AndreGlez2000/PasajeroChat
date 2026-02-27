@@ -1,4 +1,4 @@
-import { query, db } from '../db/connection';
+import { query, pool } from '../db/connection';
 import fs from 'fs';
 import path from 'path';
 
@@ -77,33 +77,28 @@ const rutasSeed = [
 
 async function runSeed() {
     console.log('Iniciando seed de la base de datos...');
-    
+
     try {
-        // Leer y ejecutar schema.sql
+        // Leer y ejecutar schema.sql (una sentencia a la vez)
         const schemaPath = path.join(__dirname, '../db/schema.sql');
         const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-        
-        // SQLite no soporta ejecutar múltiples sentencias con db.run fácilmente,
-        // así que usamos db.exec para el schema
-        await new Promise<void>((resolve, reject) => {
-            db.exec(schemaSql, (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        const statements = schemaSql
+            .split(';')
+            .map(s => s.trim())
+            .filter(s => s.length > 0 && !s.startsWith('--'));
+
+        for (const stmt of statements) {
+            await query(stmt);
+        }
         console.log('Schema creado correctamente.');
 
-        // Limpiar tablas (SQLite no soporta TRUNCATE CASCADE)
-        await query('DELETE FROM confirmations');
-        await query('DELETE FROM reports');
-        await query('DELETE FROM stops');
-        await query('DELETE FROM route_variants');
-        await query('DELETE FROM routes');
+        // Limpiar tablas
+        await query('TRUNCATE routes, route_variants, stops, reports, confirmations RESTART IDENTITY CASCADE');
         console.log('Tablas limpiadas.');
 
         for (const ruta of rutasSeed) {
             const routeRes = await query(
-                'INSERT INTO routes (name) VALUES ($1)',
+                'INSERT INTO routes (name) VALUES ($1) RETURNING id',
                 [ruta.nombre]
             );
             const routeId = routeRes.rows[0].id;
@@ -111,7 +106,7 @@ async function runSeed() {
             for (const variante of ruta.variantes) {
                 // Variante Ida
                 const varIdaRes = await query(
-                    'INSERT INTO route_variants (route_id, name, direction) VALUES ($1, $2, $3)',
+                    'INSERT INTO route_variants (route_id, name, direction) VALUES ($1, $2, $3) RETURNING id',
                     [routeId, variante.nombre, 'Ida']
                 );
                 const varIdaId = varIdaRes.rows[0].id;
@@ -127,9 +122,9 @@ async function runSeed() {
                 // Variante Vuelta
                 const [origen, destino] = variante.nombre.split(' - ');
                 const nombreVuelta = `${destino} - ${origen}`;
-                
+
                 const varVueltaRes = await query(
-                    'INSERT INTO route_variants (route_id, name, direction) VALUES ($1, $2, $3)',
+                    'INSERT INTO route_variants (route_id, name, direction) VALUES ($1, $2, $3) RETURNING id',
                     [routeId, nombreVuelta, 'Vuelta']
                 );
                 const varVueltaId = varVueltaRes.rows[0].id;
@@ -148,7 +143,7 @@ async function runSeed() {
     } catch (error) {
         console.error('Error durante el seed:', error);
     } finally {
-        db.close();
+        await pool.end();
     }
 }
 

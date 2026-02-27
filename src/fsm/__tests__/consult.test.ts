@@ -2,7 +2,7 @@ import { vi, describe, it, expect, afterEach } from 'vitest';
 
 vi.mock('../../db/connection', () => ({
     query: vi.fn(),
-    db: {},
+    pool: {},
 }));
 
 import { handleMessage } from '../stateMachine';
@@ -35,7 +35,7 @@ async function setupToVariantState(psid: string) {
 async function setupToResultsState(psid: string, minutesAgo: number = 10) {
     await setupToVariantState(psid);
 
-    const reportedAt = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString().replace('Z', '');
+    const reportedAt = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
 
     mockQuery
         .mockResolvedValueOnce({ rows: [{ id: 1, name: 'Centro → Presa' }] })
@@ -53,7 +53,7 @@ describe('consulta: selección de ruta y variante', () => {
         const psid = newPsid();
         await setupToVariantState(psid);
 
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString().replace('Z', '');
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 1, name: 'Centro → Presa' }] })
             .mockResolvedValueOnce({

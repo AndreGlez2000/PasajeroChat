@@ -1,38 +1,19 @@
-import sqlite3 from 'sqlite3';
-import path from 'path';
+import { Pool } from 'pg';
 
-const dbPath = path.join(__dirname, '../../pasajerochat.sqlite');
-
-let resolveDbReady: (message: string) => void;
-export const dbReady = new Promise<string>((resolve) => {
-    resolveDbReady = resolve;
+export const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
-export const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error conectando a SQLite:', err.message);
-        resolveDbReady('Error conectando a la base de datos SQLite.');
-    } else {
-        resolveDbReady('Conectado a la base de datos SQLite.');
-    }
+export const dbReady = pool.connect().then(client => {
+    client.release();
+    return 'Conectado a PostgreSQL.';
+}).catch((err: Error) => {
+    console.error('Error conectando a PostgreSQL:', err.message);
+    return 'Error conectando a la base de datos PostgreSQL.';
 });
 
-// Helper para usar promesas con SQLite
-export const query = (text: string, params: any[] = []): Promise<any> => {
-    return new Promise((resolve, reject) => {
-        // Convertir sintaxis de PostgreSQL ($1, $2) a SQLite (?, ?)
-        const sqliteText = text.replace(/\$\d+/g, '?');
-        
-        if (sqliteText.trim().toUpperCase().startsWith('SELECT')) {
-            db.all(sqliteText, params, (err, rows) => {
-                if (err) reject(err);
-                else resolve({ rows });
-            });
-        } else {
-            db.run(sqliteText, params, function(err) {
-                if (err) reject(err);
-                else resolve({ rows: [{ id: this.lastID }], changes: this.changes });
-            });
-        }
-    });
+export const query = async (text: string, params: any[] = []): Promise<{ rows: any[], rowCount?: number }> => {
+    const result = await pool.query(text, params);
+    return { rows: result.rows, rowCount: result.rowCount ?? 0 };
 };

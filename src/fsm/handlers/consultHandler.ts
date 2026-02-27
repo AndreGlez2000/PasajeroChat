@@ -70,7 +70,7 @@ async function showResults(userState: UserState): Promise<string> {
         `SELECT r.id, s.name as stop_name, r.reported_at, r.confirm_count
          FROM reports r
          JOIN stops s ON r.stop_id = s.id
-         WHERE r.variant_id = $1 AND r.is_active = 1 AND r.expires_at > datetime('now')
+         WHERE r.variant_id = $1 AND r.is_active = true AND r.expires_at > NOW()
          ORDER BY r.reported_at DESC LIMIT 5`,
         [userState.data.variant_id]
     );
@@ -89,7 +89,7 @@ async function showResults(userState: UserState): Promise<string> {
     let response = `📋 Últimos avistamientos para ${userState.data.ruta_nombre} (${userState.data.variant_name}):\n\n`;
 
     res.rows.forEach((row: any) => {
-        const reportedAt = new Date(row.reported_at + 'Z');
+        const reportedAt = new Date(row.reported_at);
         const minutesAgo = Math.floor((Date.now() - reportedAt.getTime()) / 60000);
         const checks = '✅'.repeat(Math.min(row.confirm_count + 1, 3));
         response += `• ${row.stop_name} - hace ${minutesAgo} min ${checks} (${row.confirm_count} confirmaciones)\n`;
