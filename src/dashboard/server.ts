@@ -400,6 +400,15 @@ app.get('/api/analytics/route-coverage', async (_req: Request, res: Response) =>
     catch (err) { res.status(500).json({ error: String(err) }); }
 });
 
+app.delete('/api/reports/:id', requireAuth, async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: 'ID inválido' }); return; }
+    try {
+        await query('DELETE FROM reports WHERE id = $1', [id]);
+        res.json({ ok: true });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+});
+
 // ---- Admin: User management ----
 
 app.get('/admin/users', requireAuth, async (req: Request, res: Response) => {

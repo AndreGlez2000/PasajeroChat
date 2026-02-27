@@ -510,6 +510,18 @@ tbody td {
 .expires.expiring { color: var(--yellow); }
 .expires.critical { color: var(--red); font-weight: 600; }
 
+.btn-delete {
+    background: transparent;
+    border: 1px solid #3f1d1d;
+    color: #6b2a2a;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-delete:hover { background: #3f1d1d; color: #f87171; border-color: #7f1d1d; }
+
 /* ================================================================
    Route coverage list (sidebar)
    ================================================================ */

@@ -326,7 +326,7 @@ function renderActiveReports(reports) {
 
     const tbody = document.getElementById('activeReportsBody');
     if (n === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-row">Sin reportes activos en este momento</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-row">Sin reportes activos en este momento</td></tr>';
         return;
     }
 
@@ -338,7 +338,7 @@ function renderActiveReports(reports) {
                            : minsLeft <= 30 ? 'expires expiring'
                            : 'expires';
         return `
-        <tr>
+        <tr id="report-row-${r.id}">
             <td>${chip(r.route_name)}</td>
             <td>
                 ${esc(r.variant_name)}
@@ -347,8 +347,22 @@ function renderActiveReports(reports) {
             <td>${esc(r.stop_name)}</td>
             <td><span class="time-ago${fresh ? ' fresh' : ''}">hace ${ago}</span></td>
             <td><span class="${expiresClass}">${timeUntil(r.expires_at)}</span></td>
+            <td><button class="btn-delete" onclick="deleteReport(${r.id})" title="Borrar reporte">✕</button></td>
         </tr>`;
     }).join('');
+}
+
+async function deleteReport(id) {
+    if (!confirm('¿Borrar este reporte?')) return;
+    const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+        const row = document.getElementById(`report-row-${id}`);
+        if (row) row.remove();
+        if (lastData) {
+            lastData.activeReports = lastData.activeReports.filter(r => r.id !== id);
+            renderActiveReports(lastData.activeReports);
+        }
+    }
 }
 
 // ================================================================
