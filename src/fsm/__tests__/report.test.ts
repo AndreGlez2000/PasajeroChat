@@ -37,6 +37,7 @@ async function setupToStopState(psid: string) {
 
     mockQuery
         .mockResolvedValueOnce({ rows: [{ id: 1, name: 'Centro → Presa' }, { id: 2, name: 'Presa → Centro' }] }) // SELECT route_variants (validar índice)
+        .mockResolvedValueOnce({ rows: [] })                                                                       // SELECT reports recientes (sin avistamientos)
         .mockResolvedValueOnce({ rows: [{ id: 1, name: 'Zona Centro' }, { id: 2, name: 'Clínica 7' }] });        // SELECT stops
 
     await handleMessage(psid, '1'); // variante 1 → aguardando_parada
@@ -114,6 +115,7 @@ describe('selección de variante', () => {
 
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 1, name: 'Centro → Presa' }, { id: 2, name: 'Presa → Centro' }] })
+            .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [{ name: 'Zona Centro' }, { name: 'Clínica 7' }] });
 
         const res = await handleMessage(psid, '1');
@@ -151,14 +153,14 @@ describe('guardado del reporte', () => {
 
         mockQuery
             .mockResolvedValueOnce({ rows: [{ id: 1, name: 'Zona Centro' }, { id: 2, name: 'Clínica 7' }] }) // SELECT stops
-            .mockResolvedValueOnce({ rows: [] })           // spam check → sin reportes recientes
-            .mockResolvedValueOnce({ rows: [{ id: 10 }] }); // INSERT report
+            .mockResolvedValueOnce({ rows: [] })            // spam check → sin reportes recientes
+            .mockResolvedValueOnce({ rows: [{ id: 10 }] }) // INSERT report
+            .mockResolvedValueOnce({ rows: [] });           // SELECT avistamientos activos (mensaje de éxito)
 
         const res = await handleMessage(psid, '2'); // parada 2 = Clínica 7
-        expect(res).toContain('✅');
         expect(res).toContain('Reporte guardado');
         expect(res).toContain('Clínica 7');
-        expect(res).toContain('¿Qué deseas hacer?'); // regresó al menú
+        expect(res).toContain('Regresar al menú');
     });
 
     it('muestra cuántos minutos faltan cuando el usuario acaba de reportar', async () => {
@@ -195,5 +197,22 @@ describe('guardado del reporte', () => {
 
         const res = await handleMessage(psid, 'centro');
         expect(res).toContain('❌');
+    });
+
+    it('cooldown no bloquea reportar una variante distinta', async () => {
+        const psid = newPsid();
+        await setupToStopState(psid);
+
+        // El spam check filtra por variant_id, así que devuelve vacío para esta variante
+        // aunque el usuario haya reportado otra variante recientemente
+        mockQuery
+            .mockResolvedValueOnce({ rows: [{ id: 1, name: 'Zona Centro' }] }) // SELECT stops
+            .mockResolvedValueOnce({ rows: [] })                                // spam check por variante → sin cooldown
+            .mockResolvedValueOnce({ rows: [{ id: 11 }] })                     // INSERT report
+            .mockResolvedValueOnce({ rows: [] });                               // SELECT avistamientos activos
+
+        const res = await handleMessage(psid, '1');
+        expect(res).toContain('Reporte guardado');
+        expect(res).not.toContain('⏳');
     });
 });

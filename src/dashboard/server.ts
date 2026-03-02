@@ -278,7 +278,7 @@ async function getByRoute() {
 
 async function getByHour() {
     const result = await query(`
-        SELECT EXTRACT(HOUR FROM reported_at)::text as hour, COUNT(*) as count
+        SELECT EXTRACT(HOUR FROM reported_at AT TIME ZONE 'America/Tijuana')::text as hour, COUNT(*) as count
         FROM reports
         WHERE reported_at > NOW() - INTERVAL '24 hours'
         GROUP BY hour
@@ -330,7 +330,7 @@ async function getSuspiciousUsers() {
 async function getHourlyHistorical() {
     const [historical, today] = await Promise.all([
         query(`
-            SELECT EXTRACT(HOUR FROM reported_at)::text as hour,
+            SELECT EXTRACT(HOUR FROM reported_at AT TIME ZONE 'America/Tijuana')::text as hour,
                    ROUND((COUNT(*)::NUMERIC / 30), 1) as avg_count
             FROM reports
             WHERE reported_at > NOW() - INTERVAL '30 days'
@@ -338,7 +338,7 @@ async function getHourlyHistorical() {
             ORDER BY hour
         `),
         query(`
-            SELECT EXTRACT(HOUR FROM reported_at)::text as hour, COUNT(*) as count
+            SELECT EXTRACT(HOUR FROM reported_at AT TIME ZONE 'America/Tijuana')::text as hour, COUNT(*) as count
             FROM reports
             WHERE reported_at > NOW() - INTERVAL '24 hours'
             GROUP BY hour

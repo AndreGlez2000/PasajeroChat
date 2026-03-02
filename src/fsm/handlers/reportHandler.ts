@@ -88,9 +88,9 @@ export async function handleReport(psid: string, userState: UserState, text: str
         // Validando Spam
         const spamCheck = await query(
             `SELECT reported_at FROM reports
-             WHERE user_psid = $1 AND reported_at > NOW() - INTERVAL '10 minutes'
+             WHERE user_psid = $1 AND variant_id = $2 AND reported_at > NOW() - INTERVAL '10 minutes'
              ORDER BY reported_at DESC LIMIT 1`,
-            [psid]
+            [psid, userState.data.variant_id]
         );
 
         if (spamCheck.rows.length > 0) {
@@ -104,7 +104,7 @@ export async function handleReport(psid: string, userState: UserState, text: str
         // Guardando Reporte
         await query(
             `INSERT INTO reports (variant_id, stop_id, user_psid, expires_at)
-             VALUES ($1, $2, $3, NOW() + INTERVAL '90 minutes')`,
+             VALUES ($1, $2, $3, NOW() + INTERVAL '3 hours')`,
             [userState.data.variant_id, selectedStop.id, psid]
         );
 
